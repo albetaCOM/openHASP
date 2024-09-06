@@ -13,7 +13,7 @@
 
 #include "hasplib.h"
 
-#if defined(HASP_USE_CUSTOM) && false // <-- set this to true in your code
+#if defined(HASP_USE_CUSTOM) && true // <-- set this to true in your code
 
 #include "hasp_debug.h"
 

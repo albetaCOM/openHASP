@@ -25,10 +25,14 @@
 #include "esp_http_server.h"
 #include "esp_tls.h"
 
+#include <map>
+
+
 #define MQTT_DEFAULT_NODE_TOPIC MQTT_PREFIX "/%hostname%/%topic%"
 #define MQTT_DEFAULT_GROUP_TOPIC MQTT_PREFIX "/" MQTT_GROUPNAME "/%topic%"
 #define MQTT_DEFAULT_BROADCAST_TOPIC MQTT_PREFIX "/" MQTT_TOPIC_BROADCAST "/%topic%"
 #define MQTT_DEFAULT_HASS_TOPIC "homeassistant/status"
+#define MQTT_DEFAULT_ALARMO_TOPIC "alarmo"
 
 QueueHandle_t queue;
 typedef struct
@@ -40,6 +44,7 @@ typedef struct
 char mqttClientId[64];
 String mqttNodeLwtTopic;
 String mqttHassLwtTopic;
+String mqttAlarmoTopic;
 String mqttNodeStateTopic;
 String mqttNodeCommandTopic;
 String mqttGroupCommandTopic;
@@ -70,6 +75,9 @@ static esp_mqtt_client_config_t mqtt_cfg;
 bool last_mqtt_state            = false;
 bool current_mqtt_state         = false;
 uint16_t mqtt_reconnect_counter = 0;
+
+std::map<std::string, lv_obj_t*> subscriptions_dictionary;
+
 
 static inline void mqtt_run_scripts()
 {
@@ -264,10 +272,17 @@ static void mqtt_message_cb(const char* topic, byte* payload, unsigned int lengt
         LOG_VERBOSE(TAG_MQTT, "Home Automation System: %s", state);
         return;
 
+    } else if(topic == strstr(topic, (mqttAlarmoTopic + "/state").c_str())) { // startsWith mqttGroupCommandTopic
+        lv_obj_t* alarmo_status = hasp_find_obj_from_page_id(9, 66);
+        if(!alarmo_status) return; // object doesn't exist
+        lv_label_set_text(alarmo_status, (const char*)payload);
+        return;
+
     } else {
         LOG_ERROR(TAG_MQTT, F(D_MQTT_INVALID_TOPIC ": %s"), topic); // Other topic
         return;
     }
+
 
     // catch a dangling LWT from a previous connection if it appears
     /*    if(!strcmp_P(topic, PSTR(MQTT_TOPIC_LWT))) { // endsWith LWT
@@ -295,6 +310,13 @@ static void mqtt_message_cb(const char* topic, byte* payload, unsigned int lengt
         mqtt_process_topic_payload(topic, (const char*)payload, length);
     }
 
+    if (subscriptions_dictionary[topic] != NULL) {
+        lv_obj_t* object = subscriptions_dictionary[topic];
+        if(!object) return; // object doesn't exist
+        lv_label_set_text(object, (const char*)payload);
+        return;
+    }
+
     /*    {
             mqtt_message_t data;
             snprintf(data.topic, sizeof(data.topic), topic);
@@ -320,22 +342,13 @@ static int mqttSubscribeTo(String topic)
     return err;
 }
 
-/*
-String mqttGetTopic(Preferences preferences, String subtopic, String key, String value, bool add_slash)
+int mqttSubscribeTo(lv_obj_t * obj, String topic)
 {
-    String topic = preferences.getString(key.c_str(), value);
-
-    topic.replace(F("%hostname%"), haspDevice.get_hostname());
-    topic.replace(F("%hwid%"), haspDevice.get_hardware_id());
-    topic.replace(F("%topic%"), subtopic);
-    topic.replace(F("%prefix%"), MQTT_PREFIX);
-
-    if(add_slash && !topic.endsWith("/")) {
-        topic += "/";
-    }
-    return topic;
+    // Insert objects into the subscriptions_dictionary
+    subscriptions_dictionary[topic.c_str()] = obj;
+    mqttSubscribeTo(topic);
 }
-*/
+
 
 void mqttParseTopic(String* topic, String subtopic, bool add_slash)
 {
@@ -358,6 +371,7 @@ void onMqttConnect(esp_mqtt_client_handle_t client)
     LOG_DEBUG(TAG_MQTT, F(D_BULLET "%s"), mqttGroupCommandTopic.c_str());
     LOG_DEBUG(TAG_MQTT, F(D_BULLET "%s"), mqttBroadcastCommandTopic.c_str());
     LOG_DEBUG(TAG_MQTT, F(D_BULLET "%s"), mqttHassLwtTopic.c_str());
+    LOG_DEBUG(TAG_MQTT, F(D_BULLET "%s"), mqttAlarmoTopic.c_str());
 
     // Subscribe to our incoming topics
     mqttSubscribeTo(mqttGroupCommandTopic + "/#");
@@ -389,6 +403,9 @@ void onMqttConnect(esp_mqtt_client_handle_t client)
 #endif
 
     mqttSubscribeTo(mqttHassLwtTopic);
+    mqttSubscribeTo(mqttAlarmoTopic + "/state");
+    mqttSubscribeTo(mqttAlarmoTopic + "/event");
+
 
     // Force any subscribed clients to toggle offline/online when we first connect to
     // make sure we get a full panel refresh at power on.  Sending offline,
@@ -564,6 +581,12 @@ void mqttStart()
         mqttHassLwtTopic = preferences.getString(FP_CONFIG_HASS_TOPIC, MQTT_DEFAULT_HASS_TOPIC);
         mqttParseTopic(&mqttHassLwtTopic, subtopic, false);
         LOG_WARNING(TAG_MQTT, mqttNodeLwtTopic.c_str());
+
+        subtopic         = F(MQTT_TOPIC_LWT);
+        mqttAlarmoTopic = preferences.getString(FP_CONFIG_ALARMO_TOPIC, MQTT_DEFAULT_ALARMO_TOPIC);
+        mqttParseTopic(&mqttAlarmoTopic, subtopic, false);
+        LOG_WARNING(TAG_MQTT, mqttAlarmoTopic.c_str());
+
 
         preferences.end();
     }
@@ -758,6 +781,13 @@ bool mqttGetConfig(const JsonObject& settings)
     }
 
     {
+        String nvsAlarmoTopic =
+            preferences.getString(FP_CONFIG_ALARMO_TOPIC, MQTT_DEFAULT_ALARMO_TOPIC); // Read from NVS if it exists
+        if(strcmp(nvsAlarmoTopic.c_str(), settings["topic"][FP_CONFIG_ALARMO].as<String>().c_str()) != 0) changed = true;
+        settings["topic"][FP_CONFIG_ALARMO] = nvsAlarmoTopic;
+    }
+
+    {
         uint16_t nvsPort = preferences.getUShort(FP_CONFIG_PORT, mqttPort); // Read from NVS if it exists
         if(nvsPort != settings[FP_CONFIG_PORT].as<uint16_t>()) changed = true;
         settings[FP_CONFIG_PORT] = nvsPort;
@@ -855,6 +885,10 @@ bool mqttSetConfig(const JsonObject& settings)
     topic = settings["topic"][FP_CONFIG_HASS];
     if(topic.is<const char*>()) {
         changed |= nvsUpdateString(preferences, FP_CONFIG_HASS_TOPIC, topic);
+    }
+    topic = settings["topic"][FP_CONFIG_ALARMO];
+    if(topic.is<const char*>()) {
+        changed |= nvsUpdateString(preferences, FP_CONFIG_ALARMO_TOPIC, topic);
     }
 
     // snprintf_P(mqttNodeTopic, sizeof(mqttNodeTopic), PSTR(MQTT_PREFIX "/%s/"), haspDevice.get_hostname());

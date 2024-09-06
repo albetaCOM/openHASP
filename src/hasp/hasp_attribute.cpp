@@ -2832,6 +2832,12 @@ void hasp_process_obj_attribute(lv_obj_t* obj, const char* attribute, const char
             ret = special_attribute_src(obj, payload, &text, update);
             break;
 
+        case ATTR_TOPIC:
+            // mqttSubscribeTo(obj, String(payload));
+            ret = HASP_ATTR_TYPE_STR;
+            break;
+
+
         default: {
             ret = hasp_local_style_attr(obj, attribute, attr_hash, payload, update, val);
         }

@@ -27,6 +27,7 @@ void mqttStop();
 int mqtt_send_state(const char* subtopic, const char* payload, bool retain=false);
 int mqtt_send_discovery(const char* payload, size_t len);
 int mqttPublish(const char* topic, const char* payload, size_t len, bool retain);
+int mqttSubscribeTo(lv_obj_t * obj, String topic);
 
 bool mqttIsConnected();
 void mqtt_get_info(JsonDocument& doc);

@@ -435,6 +435,8 @@ _HASP_ATTRIBUTE(SCALE_END_LINE_WIDTH, scale_end_line_width, lv_style_int_t)
 #define ATTR_JSONL 61604
 #define ATTR_MODE_FIXED 35736
 
+#define ATTR_TOPIC  29167
+
 // methods
 #define ATTR_DELETE 50027
 #define ATTR_CLEAR 1069
