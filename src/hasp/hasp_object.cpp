@@ -292,6 +292,12 @@ void hasp_new_object(const JsonObject& config, uint8_t& saved_page_id)
                 if(obj) obj->user_data.objid = LV_HASP_ALARM;
                 break;
 
+            case LV_HASP_ALARMO:
+            case HASP_OBJ_ALARMO:
+                obj = lv_obj_create(parent_obj, NULL);
+                if(obj) obj->user_data.objid = LV_HASP_ALARMO;
+                break;
+
             /* ----- Basic Objects ------ */
             case LV_HASP_BTNMATRIX:
             case HASP_OBJ_BTNMATRIX:
@@ -300,6 +306,8 @@ void hasp_new_object(const JsonObject& config, uint8_t& saved_page_id)
                     lv_btnmatrix_set_recolor(obj, true);
                     if(obj_check_type(parent_obj, LV_HASP_ALARM))
                         lv_obj_set_event_cb(obj, alarm_event_handler);
+                    else if(obj_check_type(parent_obj, LV_HASP_ALARMO))
+                        lv_obj_set_event_cb(obj, alarmo_event_handler);
                     else
                         lv_obj_set_event_cb(obj, btnmatrix_event_handler);
 

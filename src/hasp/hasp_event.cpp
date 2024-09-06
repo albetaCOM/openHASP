@@ -311,6 +311,17 @@ static void event_object_selection_changed(lv_obj_t* obj, uint8_t eventid, int16
     event_send_object_data(obj, data);
 }
 
+// Send out events with a val and text attribute
+static void alarmo_command(lv_obj_t* obj, const char* command, const char* pin)
+{
+    char data[512];
+    {
+        snprintf_P(data, sizeof(data), PSTR("{\"command\":\"%s\",\"code\":%s}"), command, pin);
+    }
+    event_send_object_data(obj, data);
+    mqttPublish(MQTT_ALARMO_COMMAND, data, strlen(data), false);
+}
+
 // ##################### Event Handlers ########################################################
 
 static inline void event_update_group(uint8_t group, lv_obj_t* obj, bool power, int32_t val, int32_t min, int32_t max)
@@ -682,6 +693,68 @@ void selector_event_handler(lv_obj_t* obj, lv_event_t event)
  * @param obj pointer to a dropdown list or roller
  * @param event type of event that occurred
  */
+void alarmo_event_handler(lv_obj_t* obj, lv_event_t event)
+{
+    log_event("alarm", event);
+
+    uint8_t hasp_event_id;
+    if(!translate_event(obj, event, hasp_event_id)) return; // Use LV_EVENT_VALUE_CHANGED
+
+    /* Get the new value */
+    static char pincode[128] = "";
+    static uint8_t pinlen = 0;
+    uint16_t val = 0;
+
+    val = lv_btnmatrix_get_active_btn(obj);
+    if(val != LV_BTNMATRIX_BTN_NONE && hasp_event_id == HASP_EVENT_UP) {
+        lv_obj_t* ta    = hasp_find_obj_from_parent_id(lv_obj_get_parent(obj), 5);
+        const char* txt = lv_btnmatrix_get_btn_text(obj, val);
+        if(strstr(txt, LV_SYMBOL_BACKSPACE)) {
+            lv_textarea_del_char(ta);
+            pinlen>0?pinlen--:pinlen=0;
+            pincode[pinlen] = 0;
+        } 
+        else if(strstr(txt, LV_SYMBOL_CLOSE)) {
+            lv_textarea_set_text(ta, "");
+            pinlen = 0;
+            pincode[pinlen] = 0;
+        } else if(strstr(txt, LV_SYMBOL_EYE_OPEN)) {
+            // const char* txt = lv_textarea_get_text(ta);
+            alarmo_command(obj, "DISARM", pincode);
+            lv_textarea_set_text(ta, "");
+            pinlen = 0;
+            pincode[pinlen] = 0;
+        } 
+        else if(strlen(txt) == 1) {
+            // lv_textarea_add_text(ta, txt);
+            lv_textarea_add_text(ta, "*");
+            pincode[pinlen] = txt[0];
+            pinlen++;
+            pincode[pinlen] = 0;
+        } else
+            ;
+        // strncpy(buffer, txt, sizeof(buffer));
+    }
+
+    if(hasp_event_id == HASP_EVENT_CHANGED && last_value_sent == val && last_obj_sent == obj)
+        return; // same object and value as before
+
+    last_value_sent = val;
+    last_obj_sent   = obj;
+    // event_object_selection_changed(obj, hasp_event_id, val, buffer);
+
+    // if(max > 0) // max a cannot be 0, its the divider
+    //     if(hasp_event_id == HASP_EVENT_UP || hasp_event_id == LV_EVENT_VALUE_CHANGED) {
+    //         event_update_group(obj->user_data.groupid, obj, last_value_sent, 0, max);
+    //     }
+}
+
+
+/**
+ * Called when a btnmatrix value has changed
+ * @param obj pointer to a dropdown list or roller
+ * @param event type of event that occurred
+ */
 void alarm_event_handler(lv_obj_t* obj, lv_event_t event)
 {
     log_event("alarm", event);
@@ -690,20 +763,37 @@ void alarm_event_handler(lv_obj_t* obj, lv_event_t event)
     if(!translate_event(obj, event, hasp_event_id)) return; // Use LV_EVENT_VALUE_CHANGED
 
     /* Get the new value */
-    // char buffer[128] = "";
+    static char pincode[128] = "";
+    static uint8_t pinlen = 0;
     uint16_t val = 0;
 
     val = lv_btnmatrix_get_active_btn(obj);
     if(val != LV_BTNMATRIX_BTN_NONE && hasp_event_id == HASP_EVENT_UP) {
         lv_obj_t* ta    = hasp_find_obj_from_parent_id(lv_obj_get_parent(obj), 5);
         const char* txt = lv_btnmatrix_get_btn_text(obj, val);
-        if(!strcmp(txt, LV_SYMBOL_BACKSPACE))
+        if(strstr(txt, LV_SYMBOL_BACKSPACE)) {
             lv_textarea_del_char(ta);
-        else if(!strcmp(txt, LV_SYMBOL_CLOSE))
+            pinlen>0?pinlen--:pinlen=0;
+            pincode[pinlen] = 0;
+        } 
+        else if(strstr(txt, LV_SYMBOL_CLOSE)) {
             lv_textarea_set_text(ta, "");
-        else if(strlen(txt) == 1)
-            lv_textarea_add_text(ta, txt);
-        else
+            pinlen = 0;
+            pincode[pinlen] = 0;
+        } else if(strstr(txt, LV_SYMBOL_EYE_OPEN)) {
+            event_object_selection_changed(obj, HASP_EVENT_DISARM, val, pincode);
+            lv_textarea_set_text(ta, "");
+            pinlen = 0;
+            pincode[pinlen] = 0;
+            const char* txt = lv_textarea_get_text(ta);
+        } 
+        else if(strlen(txt) == 1) {
+            // lv_textarea_add_text(ta, txt);
+            lv_textarea_add_text(ta, "*");
+            pincode[pinlen] = txt[0];
+            pinlen++;
+            pincode[pinlen] = 0;
+        } else
             ;
         // strncpy(buffer, txt, sizeof(buffer));
     }

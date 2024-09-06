@@ -162,6 +162,9 @@ void Parser::get_event_name(uint8_t eventid, char* buffer, size_t size)
         case HASP_EVENT_CHANGED:
             memcpy_P(buffer, PSTR("changed"), 8);
             break;
+        case HASP_EVENT_DISARM:
+            memcpy_P(buffer, PSTR("disarm"), 8);
+            break;
         default:
             memcpy_P(buffer, PSTR("unknown"), 8);
     }

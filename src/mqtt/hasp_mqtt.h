@@ -70,6 +70,11 @@ bool mqttSetConfig(const JsonObject& settings);
 
 #define MQTT_TOPIC_LWT "LWT"
 
+#ifndef MQTT_ALARMO_COMMAND
+#define MQTT_ALARMO_COMMAND "alarmo/command"
+#endif
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // These defaults may be overwritten with values saved by the web interface
 

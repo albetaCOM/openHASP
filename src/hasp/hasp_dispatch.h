@@ -44,7 +44,9 @@ enum hasp_event_t { // even = released, odd = pressed
     HASP_EVENT_CLOSING = 13,
     HASP_EVENT_STOP    = 14,
 
-    HASP_EVENT_CHANGED = 32
+    HASP_EVENT_CHANGED = 32,
+    HASP_EVENT_DISARM = 33,
+
 };
 
 /* ===== Default Event Processors ===== */
