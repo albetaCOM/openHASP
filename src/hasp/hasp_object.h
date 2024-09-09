@@ -93,6 +93,7 @@ enum lv_hasp_obj_type_t {
     /* Custom */
     LV_HASP_ALARM = 60,
     LV_HASP_ALARMO = 61,
+    LV_HASP_COUNTDOWN = 62,
 
 };
 
@@ -195,5 +196,6 @@ inline bool obj_check_type(const lv_obj_t* obj, lv_hasp_obj_type_t haspobjtype)
 #define HASP_OBJ_ARC 64594
 #define HASP_OBJ_ALARM 3153
 #define HASP_OBJ_ALARMO 2142
+#define HASP_OBJ_COUNTDOWN 50161
 
 #endif

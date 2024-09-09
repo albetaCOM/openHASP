@@ -76,7 +76,13 @@ bool last_mqtt_state            = false;
 bool current_mqtt_state         = false;
 uint16_t mqtt_reconnect_counter = 0;
 
-std::map<std::string, lv_obj_t*> subscriptions_dictionary;
+// Define a struct to hold the lv_obj_t* and the function pointer
+struct Subscription {
+    lv_obj_t* obj;
+    std::function<void(lv_obj_t * obj, const char * text)> callback;
+};
+
+std::map<String, Subscription> subscriptions_dictionary;
 
 
 static inline void mqtt_run_scripts()
@@ -272,10 +278,17 @@ static void mqtt_message_cb(const char* topic, byte* payload, unsigned int lengt
         LOG_VERBOSE(TAG_MQTT, "Home Automation System: %s", state);
         return;
 
-    } else if(topic == strstr(topic, (mqttAlarmoTopic + "/state").c_str())) { // startsWith mqttGroupCommandTopic
+    } else if(topic == strstr(topic, mqttAlarmoTopic.c_str())) { // startsWith mqttGroupCommandTopic
         lv_obj_t* alarmo_status = hasp_find_obj_from_page_id(9, 66);
         if(!alarmo_status) return; // object doesn't exist
         lv_label_set_text(alarmo_status, (const char*)payload);
+        return;
+
+    } else if (subscriptions_dictionary[String(topic)].obj != NULL) {
+        LOG_WARNING(TAG_MQTT, "================================= Object found for topic:'%s'", String(topic));
+        lv_obj_t* object = subscriptions_dictionary[String(topic)].obj;
+        if(!object) return; // object doesn't exist
+        subscriptions_dictionary[String(topic)].callback(object, (const char*)payload);
         return;
 
     } else {
@@ -310,12 +323,6 @@ static void mqtt_message_cb(const char* topic, byte* payload, unsigned int lengt
         mqtt_process_topic_payload(topic, (const char*)payload, length);
     }
 
-    if (subscriptions_dictionary[topic] != NULL) {
-        lv_obj_t* object = subscriptions_dictionary[topic];
-        if(!object) return; // object doesn't exist
-        lv_label_set_text(object, (const char*)payload);
-        return;
-    }
 
     /*    {
             mqtt_message_t data;
@@ -342,11 +349,12 @@ static int mqttSubscribeTo(String topic)
     return err;
 }
 
-int mqttSubscribeTo(lv_obj_t * obj, String topic)
+void mqttSubscribeTo(lv_obj_t * obj, String topic, std::function<void(lv_obj_t * obj, const char * text)> callback)
 {
     // Insert objects into the subscriptions_dictionary
-    subscriptions_dictionary[topic.c_str()] = obj;
-    mqttSubscribeTo(topic);
+    subscriptions_dictionary[topic].obj = obj;
+    subscriptions_dictionary[topic].callback = callback;
+    // mqttSubscribeTo(topic);
 }
 
 
@@ -403,9 +411,15 @@ void onMqttConnect(esp_mqtt_client_handle_t client)
 #endif
 
     mqttSubscribeTo(mqttHassLwtTopic);
-    mqttSubscribeTo(mqttAlarmoTopic + "/state");
-    mqttSubscribeTo(mqttAlarmoTopic + "/event");
+    mqttSubscribeTo(mqttAlarmoTopic);
+    LOG_WARNING(TAG_MQTT, "=================================Subscribing to alarmo topic:'%s'", mqttAlarmoTopic.c_str());
 
+    for (const auto& pair : subscriptions_dictionary) {
+        String key = pair.first;
+        // Do something with key and value
+        mqttSubscribeTo(key);
+        LOG_WARNING(TAG_MQTT, "=================================Subscribing to object topic:'%s'", key);
+    }
 
     // Force any subscribed clients to toggle offline/online when we first connect to
     // make sure we get a full panel refresh at power on.  Sending offline,
@@ -586,7 +600,6 @@ void mqttStart()
         mqttAlarmoTopic = preferences.getString(FP_CONFIG_ALARMO_TOPIC, MQTT_DEFAULT_ALARMO_TOPIC);
         mqttParseTopic(&mqttAlarmoTopic, subtopic, false);
         LOG_WARNING(TAG_MQTT, mqttAlarmoTopic.c_str());
-
 
         preferences.end();
     }
@@ -785,6 +798,8 @@ bool mqttGetConfig(const JsonObject& settings)
             preferences.getString(FP_CONFIG_ALARMO_TOPIC, MQTT_DEFAULT_ALARMO_TOPIC); // Read from NVS if it exists
         if(strcmp(nvsAlarmoTopic.c_str(), settings["topic"][FP_CONFIG_ALARMO].as<String>().c_str()) != 0) changed = true;
         settings["topic"][FP_CONFIG_ALARMO] = nvsAlarmoTopic;
+        LOG_WARNING(TAG_MQTT, "NVS Alarmo: %s", nvsAlarmoTopic.c_str());
+
     }
 
     {

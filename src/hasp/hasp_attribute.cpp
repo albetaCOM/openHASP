@@ -1747,6 +1747,7 @@ static hasp_attribute_type_t attribute_common_text(lv_obj_t* obj, uint16_t attr_
     uint8_t obj_type = obj_get_type(obj);
 
     hasp_attr_update_char_const_t list[] = {
+        {LV_HASP_COUNTDOWN, ATTR_TEXT, my_label_set_text, my_label_get_text},
         {LV_HASP_BUTTON, ATTR_TEXT, my_btn_set_text, my_btn_get_text},
         {LV_HASP_LABEL, ATTR_TEXT, my_label_set_text, my_label_get_text},
         {LV_HASP_LABEL, ATTR_TEMPLATE, my_obj_set_template, my_obj_get_template},
@@ -2831,10 +2832,18 @@ void hasp_process_obj_attribute(lv_obj_t* obj, const char* attribute, const char
         case ATTR_SRC:
             ret = special_attribute_src(obj, payload, &text, update);
             break;
-
         case ATTR_TOPIC:
-            // mqttSubscribeTo(obj, String(payload));
+        {
+            lv_obj_type_t object_type;
+            lv_obj_get_type(obj, &object_type);
+            // Compare the object's class with the lv_label_class
+            if (object_type.type[0] != NULL) {
+                if (strcmp(object_type.type[0], "lv_label") != 0) {
+                    mqttSubscribeTo(obj, String(payload), lv_label_set_text);
+                }
+            }
             ret = HASP_ATTR_TYPE_STR;
+        }
             break;
 
 

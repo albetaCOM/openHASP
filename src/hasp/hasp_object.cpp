@@ -216,6 +216,8 @@ static void object_add_task(lv_obj_t* obj, lv_task_cb_t task_xcb, uint16_t inter
     lv_task_t* task     = lv_task_create(task_xcb, interval, LV_TASK_PRIO_LOWEST, (void*)user_data);
     lv_task_set_repeat_count(task, -1); // Infinite
     lv_task_ready(task);                // trigger it
+
+    LOG_WARNING(TAG_HASP, "======================= Creating task");
     // (void)task; // unused
 }
 
@@ -270,7 +272,7 @@ void hasp_new_object(const JsonObject& config, uint8_t& saved_page_id)
         /* Create the object first */
 
         /* Validate type */
-       // if(config[FPSTR(FP_OBJID)].isNull()) { // TODO: obsolete objid
+        // if(config[FPSTR(FP_OBJID)].isNull()) { // TODO: obsolete objid
             if(config[FPSTR(FP_OBJ)].isNull()) {
                 return; // comments
             } else {
@@ -286,6 +288,18 @@ void hasp_new_object(const JsonObject& config, uint8_t& saved_page_id)
 
         switch(sdbm) {
                 /* ----- Custom Objects ------ */
+            case LV_HASP_COUNTDOWN:
+            case HASP_OBJ_COUNTDOWN:
+                obj = lv_label_create(parent_obj, NULL);
+                if(obj) {
+                    lv_label_set_long_mode(obj, LV_LABEL_LONG_CROP);
+                    lv_label_set_recolor(obj, true);
+                    obj->user_data.objid = LV_HASP_COUNTDOWN;
+                    object_add_task(obj, event_timer_countdown, 1000);
+                    // if(id >= 250) object_add_task(obj, event_timer_clock, 1000);
+                }            
+                break;
+
             case LV_HASP_ALARM:
             case HASP_OBJ_ALARM:
                 obj = lv_obj_create(parent_obj, NULL);

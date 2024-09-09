@@ -119,6 +119,30 @@ void delete_event_handler(lv_obj_t* obj, lv_event_t event)
 }
 
 /* ============================== Timer Event  ============================ */
+void event_timer_countdown(lv_task_t* task)
+{
+    hasp_task_user_data_t* data = (hasp_task_user_data_t*)task->user_data;
+    lv_obj_t* obj               = data->obj;
+
+    // if(data) obj = hasp_find_obj_from_page_id(data->pageid, data->objid);
+    if(!obj || !data || !obj_check_type(obj, LV_HASP_COUNTDOWN)) {
+        if(data) lv_mem_free(data); // the object that the user_data points to is gone
+        lv_task_del(task);          // the calendar object for this task was deleted
+        LOG_WARNING(TAG_EVENT, "event_timer_countdown could not find the linked object");
+        return;
+    }
+
+    int counter = atoi(lv_label_get_text(obj));
+
+    if (counter > 0) {
+        counter--;
+        char buffer[10];
+        snprintf(buffer, sizeof(buffer), "%d", counter); // Convert countdown_value to string
+        lv_label_set_text(obj, buffer);
+    }
+    // lv_task_set_period(task, 1000); // try again in a minute
+}
+
 #if LV_USE_CALENDAR > 0
 void event_timer_calendar(lv_task_t* task)
 {
@@ -314,12 +338,14 @@ static void event_object_selection_changed(lv_obj_t* obj, uint8_t eventid, int16
 // Send out events with a val and text attribute
 static void alarmo_command(lv_obj_t* obj, const char* command, const char* pin)
 {
+    extern String mqttAlarmoTopic;
     char data[512];
     {
         snprintf_P(data, sizeof(data), PSTR("{\"command\":\"%s\",\"code\":%s}"), command, pin);
     }
     event_send_object_data(obj, data);
-    mqttPublish(MQTT_ALARMO_COMMAND, data, strlen(data), false);
+    String alarmoCommandTopic = mqttAlarmoTopic + "/command";
+    mqttPublish(alarmoCommandTopic.c_str(), data, strlen(data), false);
 }
 
 // ##################### Event Handlers ########################################################

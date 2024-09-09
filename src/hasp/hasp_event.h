@@ -29,6 +29,7 @@ void calendar_event_handler(lv_obj_t* obj, lv_event_t event);
 void textarea_event_handler(lv_obj_t* obj, lv_event_t event);
 void alarm_event_handler(lv_obj_t* obj, lv_event_t event);
 void alarmo_event_handler(lv_obj_t* obj, lv_event_t event);
+void event_timer_countdown(lv_task_t* task);
 
 // Other functions
 void event_reset_last_value_sent();

@@ -1519,7 +1519,7 @@ static void http_handle_mqtt()
 </div>
 <div class="row">
 <div class="col-25"><label for="alarmo_t" v-t="'mqtt.alarmo_t'"></label></div>
-<div class="col-75"><input type="text" id="alarmo_t" maxlength="128" placeholder="Alarmo Topic" v-model="config.mqtt.topic.alarmo_t"></div>
+<div class="col-75"><input type="text" id="alarmo_t" maxlength="128" placeholder="Alarmo Topic" v-model="config.mqtt.topic.alarmo"></div>
 </div>)";
 
     html[min(i++, len)] = R"(<button type="submit" v-t="'save'"></button></form></div>)";
